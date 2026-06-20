@@ -1,0 +1,99 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Automated WAF Dashboard</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #07111f;
+      --panel: #0d1b2a;
+      --panel-2: #10263d;
+      --text: #e6eef8;
+      --muted: #8da3bf;
+      --accent: #57d1ff;
+      --danger: #ff6b6b;
+      --ok: #49d17f;
+      --warn: #ffce54;
+      --border: rgba(255, 255, 255, 0.08);
+    }
+    body {
+      margin: 0;
+      font-family: Inter, ui-sans-serif, system-ui, sans-serif;
+      background: radial-gradient(circle at top left, rgba(87, 209, 255, 0.14), transparent 30%), linear-gradient(180deg, #050b15 0%, var(--bg) 100%);
+      color: var(--text);
+    }
+    .wrap { max-width: 1200px; margin: 0 auto; padding: 32px 20px 48px; }
+    .hero { display: flex; justify-content: space-between; gap: 20px; align-items: end; margin-bottom: 24px; }
+    h1 { margin: 0; font-size: clamp(2rem, 4vw, 3.5rem); letter-spacing: -0.04em; }
+    .sub { color: var(--muted); max-width: 720px; line-height: 1.5; }
+    .grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 16px; margin: 24px 0; }
+    .card { background: linear-gradient(180deg, rgba(16, 38, 61, 0.95), rgba(13, 27, 42, 0.95)); border: 1px solid var(--border); border-radius: 18px; padding: 18px; box-shadow: 0 20px 60px rgba(0, 0, 0, 0.25); }
+    .card .label { color: var(--muted); font-size: 0.9rem; }
+    .card .value { font-size: 2rem; margin-top: 8px; font-weight: 700; }
+    .section { margin-top: 28px; display: grid; grid-template-columns: 1.3fr 1fr; gap: 18px; }
+    .panel { background: rgba(16, 38, 61, 0.72); border: 1px solid var(--border); border-radius: 18px; padding: 20px; }
+    table { width: 100%; border-collapse: collapse; }
+    th, td { text-align: left; padding: 10px 8px; border-bottom: 1px solid var(--border); font-size: 0.94rem; }
+    th { color: var(--muted); font-weight: 600; }
+    .tag { display: inline-flex; align-items: center; padding: 4px 10px; border-radius: 999px; font-size: 0.82rem; }
+    .tag.ok { background: rgba(73, 209, 127, 0.15); color: var(--ok); }
+    .tag.block { background: rgba(255, 107, 107, 0.15); color: var(--danger); }
+    .tag.warn { background: rgba(255, 206, 84, 0.15); color: var(--warn); }
+    .list { display: grid; gap: 10px; }
+    .alert { border: 1px solid var(--border); border-radius: 14px; padding: 12px 14px; background: rgba(7, 17, 31, 0.55); }
+    .meta { color: var(--muted); font-size: 0.84rem; margin-top: 4px; }
+    @media (max-width: 960px) { .grid, .section { grid-template-columns: 1fr; } .hero { flex-direction: column; align-items: start; } }
+  </style>
+</head>
+<body>
+  <main class="wrap">
+    <section class="hero">
+      <div>
+        <h1>Automated WAF</h1>
+        <p class="sub">A reverse proxy security layer that inspects requests, scores suspicious payloads, logs incidents, and escalates repeat offenders automatically.</p>
+      </div>
+      <div class="tag ok">Live Security View</div>
+    </section>
+
+    <section class="grid" id="stats"></section>
+
+    <section class="section">
+      <div class="panel">
+        <h2>Top Attack Types</h2>
+        <table>
+          <thead><tr><th>Type</th><th>Count</th></tr></thead>
+          <tbody id="attacks"></tbody>
+        </table>
+      </div>
+      <div class="panel">
+        <h2>Recent Alerts</h2>
+        <div class="list" id="alerts"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    async function refresh() {
+      const response = await fetch('/api/metrics');
+      const data = await response.json();
+      document.getElementById('stats').innerHTML = [
+        ['Total Requests', data.total_requests],
+        ['Allowed Requests', data.allowed_requests],
+        ['Blocked Requests', data.blocked_requests],
+        ['Total Events', data.total_events],
+      ].map(([label, value]) => `<article class="card"><div class="label">${label}</div><div class="value">${value}</div></article>`).join('');
+      document.getElementById('attacks').innerHTML = data.top_attack_types.map((item) => `<tr><td>${item.name}</td><td>${item.count}</td></tr>`).join('') || '<tr><td colspan="2">No attacks recorded</td></tr>';
+      document.getElementById('alerts').innerHTML = data.recent_alerts.map((item) => `
+        <article class="alert">
+          <strong>${item.source_ip}</strong> · ${item.request_path}
+          <div class="meta">${item.method} · ${item.detection_type} · score ${item.threat_score} · ${item.action_taken}</div>
+        </article>
+      `).join('') || '<div class="meta">No alerts yet</div>';
+    }
+    refresh();
+    setInterval(refresh, 5000);
+  </script>
+</body>
+</html>
